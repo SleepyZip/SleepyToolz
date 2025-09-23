@@ -1,12 +1,12 @@
 // ==========================================================
 // Scroll Tester + Mouse Diagram (hold timers, dbl-click flash)
-// - Windowed P2D (80% x 70% of display)
-// - Scroll tracer (no glow, crisp white line)
-// - Green/red vertical bars on wheel
-// - Trail fade with gamma
-// - HUD for counts/persistence/tick height
-// - Mouse diagram on the right with L/M/R buttons,
-//   hold-time badges (ms), press flash, double-click outline
+// - Windowed (80% x 70% of display)
+// - Scroll tracer crispy ass white line
+// - Green/red vertical ass bars on wheel up/down
+// - Trail fade with gamma. bunch of Transparent black layers stack up to black out elements
+// - HUD text for counts/persistence/tick height
+// - Mouse diagram of a mouse and the L/M/R buttons,
+// - hold-time badges (ms), press flash, double-click outline
 // - Scroll-wheel slit pulses green/red on recent scroll
 // ==========================================================
 
@@ -408,3 +408,4 @@ void drawHoldBadge(float bx, float by, float bw, float bh, int ms, boolean show)
   text(s, cx, ty + (pillH - th) * 0.5f);
   popStyle();
 }
+
