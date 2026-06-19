@@ -10,7 +10,7 @@
 // - Scroll-wheel slit pulses green/red on recent scroll
 // ==========================================================
 
-import processing.event.MouseEvent;
+
 
 // ===== Glow config (disabled by default) =====
 boolean glowOn = false;   // tracer/bars glow disabled
