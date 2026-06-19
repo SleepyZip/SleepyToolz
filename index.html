@@ -1,18 +1,345 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <script src="https://cdn.jsdelivr.net/npm/p5@1.11.11/lib/p5.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/p5@1.11.11/lib/addons/p5.sound.min.js"></script>
-    
-    
-    
-    <link rel="stylesheet" type="text/css" href="style.css">
-    <meta charset="utf-8" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scroll Tester + Mouse Diagram</title>
+    <style>
+        /* Strict Utilitarian Styling */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            background-color: #1b1e1b; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        /* Lock canvas size to match the original P2D window */
+        canvas {
+            width: 80vw;
+            height: 70vh;
+            border: 2px solid #586d4e;
+            background-color: #000;
+            box-shadow: 8px 8px 0px rgba(88, 109, 78, 0.3);
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
 
-  </head>
-  <body>
-    <main>
-    </main>
-    <script type="module" src="sketch.js"></script>
-  </body>
+<canvas id="app"></canvas>
+
+<script>
+    const canvas = document.getElementById('app');
+    const ctx = canvas.getContext('2d');
+
+    // ===== Positions & Scaling =====
+    let x, y, prevx;
+    let tickHeight, strokeW, hudTextSize, hudPad;
+
+    // ===== Trail fade control =====
+    const FADE_MIN = 0, FADE_MAX = 50, FADE_STEP = 1, TRAIL_GAMMA = 1.6;
+    let fadeAlphaDefault = 25;
+    let fadeAlpha = fadeAlphaDefault;
+
+    // ===== State / HUD =====
+    let upCount = 0, downCount = 0;
+    let skipDotFrames = 0;
+
+    // ===== Mouse Diagram state =====
+    const FLASH_FRAMES = 10, DBL_FLASH_FRAMES = 60, DOUBLE_CLICK_MS = 300;
+    let leftHeld = false, middleHeld = false, rightHeld = false;
+    let leftFlash = 0, midFlash = 0, rightFlash = 0;
+    let leftDblFlash = 0, midDblFlash = 0, rightDblFlash = 0;
+    let lastLeftReleaseMs = -100000, lastMidReleaseMs = -100000, lastRightReleaseMs = -100000;
+    let leftStartMs = -1, midStartMs = -1, rightStartMs = -1;
+    let leftHeldMs = 0, midHeldMs = 0, rightHeldMs = 0;
+
+    let wheelPulseFrames = 0, wheelDir = 0;
+
+    // Initialize dimensions
+    function setup() {
+        // Match internal resolution to display resolution for crisp lines
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+
+        x = canvas.width * 0.15;
+        y = canvas.height * 0.5;
+        prevx = x;
+
+        let S = Math.min(canvas.width, canvas.height);
+        tickHeight = Math.max(2, S * 0.03);
+        strokeW = Math.max(1, S * 0.003);
+        hudTextSize = Math.max(10, S * 0.025);
+        hudPad = Math.max(6, S * 0.008);
+        
+        ctx.lineCap = 'square';
+    }
+
+    // Main Draw Loop (Runs at 60fps natively)
+    function draw() {
+        // === TRAIL FADE ===
+        let xAlpha = fadeAlpha / FADE_MAX;
+        let effectiveAlpha = Math.floor(FADE_MAX * Math.pow(xAlpha, TRAIL_GAMMA));
+        ctx.fillStyle = `rgba(0, 0, 0, ${effectiveAlpha / 255})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // === HORIZONTAL TRACER ===
+        if (skipDotFrames === 0) {
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = strokeW;
+            ctx.beginPath();
+            ctx.moveTo(prevx, y);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+        }
+
+        prevx = x;
+        x += Math.max(1, strokeW);
+        if (x >= canvas.width) {
+            x = 0;
+            prevx = x;
+        }
+        if (skipDotFrames > 0) skipDotFrames--;
+
+        updateHoldTimers();
+        tickMouseAnimations();
+
+        drawHUD();
+        drawMouseDiagram();
+
+        requestAnimationFrame(draw);
+    }
+
+    // ===== Input Handling =====
+    window.addEventListener('mousedown', (e) => {
+        if (e.button === 0) { leftHeld = true; leftFlash = FLASH_FRAMES; }
+        if (e.button === 1) { middleHeld = true; midFlash = FLASH_FRAMES; }
+        if (e.button === 2) { rightHeld = true; rightFlash = FLASH_FRAMES; }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+        let now = performance.now();
+        if (e.button === 0) {
+            leftHeld = false;
+            if (now - lastLeftReleaseMs <= DOUBLE_CLICK_MS) leftDblFlash = DBL_FLASH_FRAMES;
+            lastLeftReleaseMs = now;
+        }
+        if (e.button === 1) {
+            middleHeld = false;
+            if (now - lastMidReleaseMs <= DOUBLE_CLICK_MS) midDblFlash = DBL_FLASH_FRAMES;
+            lastMidReleaseMs = now;
+        }
+        if (e.button === 2) {
+            rightHeld = false;
+            if (now - lastRightReleaseMs <= DOUBLE_CLICK_MS) rightDblFlash = DBL_FLASH_FRAMES;
+            lastRightReleaseMs = now;
+        }
+    });
+
+    // Prevent default right-click menu over the canvas
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault(); // Stop page scrolling
+        let steps = Math.sign(e.deltaY); 
+        if (steps === 0) return;
+
+        let isUp = steps < 0; 
+        if (isUp) upCount++;
+        else downCount++;
+
+        let barColor = isUp ? 'rgb(0, 255, 0)' : 'rgb(255, 0, 0)';
+        let newY = y + steps * tickHeight;
+
+        ctx.strokeStyle = barColor;
+        ctx.lineWidth = strokeW;
+        drawVerticalBarWithWrap(x, y, newY);
+
+        y = wrapY(newY);
+        skipDotFrames = 2;
+
+        wheelDir = isUp ? 1 : -1;
+        wheelPulseFrames = 30;
+    }, { passive: false });
+
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowUp' || e.key === '+') fadeAlpha = Math.max(FADE_MIN, fadeAlpha - FADE_STEP);
+        if (e.key === 'ArrowDown' || e.key === '-') fadeAlpha = Math.min(FADE_MAX, fadeAlpha + FADE_STEP);
+        if (e.key === '0') fadeAlpha = 0;
+        if (e.key.toLowerCase() === 'r') fadeAlpha = fadeAlphaDefault;
+        if (e.key === 'ArrowRight') tickHeight = Math.min(tickHeight * 1.1, 100);
+        if (e.key === 'ArrowLeft') tickHeight = Math.max(1, tickHeight / 1.1);
+    });
+
+    // ===== Helpers =====
+    function wrapY(v) {
+        let h = canvas.height;
+        let m = v % h;
+        if (m < 0) m += h;
+        return m;
+    }
+
+    function drawVerticalBarWithWrap(xLine, yStart, yEnd) {
+        ctx.beginPath();
+        if (yEnd >= 0 && yEnd < canvas.height) {
+            ctx.moveTo(xLine, yStart); ctx.lineTo(xLine, yEnd);
+        } else {
+            let dest = wrapY(yEnd);
+            if (yEnd >= canvas.height) {
+                ctx.moveTo(xLine, yStart); ctx.lineTo(xLine, canvas.height - 1);
+                ctx.moveTo(xLine, 0); ctx.lineTo(xLine, dest);
+            } else {
+                ctx.moveTo(xLine, yStart); ctx.lineTo(xLine, 0);
+                ctx.moveTo(xLine, canvas.height - 1); ctx.lineTo(xLine, dest);
+            }
+        }
+        ctx.stroke();
+    }
+
+    function updateHoldTimers() {
+        let now = performance.now();
+        if (leftHeld) { if (leftStartMs < 0) leftStartMs = now; leftHeldMs = Math.floor(now - leftStartMs); } else { leftStartMs = -1; leftHeldMs = 0; }
+        if (middleHeld) { if (midStartMs < 0) midStartMs = now; midHeldMs = Math.floor(now - midStartMs); } else { midStartMs = -1; midHeldMs = 0; }
+        if (rightHeld) { if (rightStartMs < 0) rightStartMs = now; rightHeldMs = Math.floor(now - rightStartMs); } else { rightStartMs = -1; rightHeldMs = 0; }
+    }
+
+    function tickMouseAnimations() {
+        if (leftFlash > 0) leftFlash--;
+        if (midFlash > 0) midFlash--;
+        if (rightFlash > 0) rightFlash--;
+        if (leftDblFlash > 0) leftDblFlash--;
+        if (midDblFlash > 0) midDblFlash--;
+        if (rightDblFlash > 0) rightDblFlash--;
+        if (wheelPulseFrames > 0) wheelPulseFrames--;
+    }
+
+    // ===== UI Drawing =====
+    function drawHUD() {
+        ctx.font = `${hudTextSize}px monospace`;
+        let persistence = Math.floor(((FADE_MAX - fadeAlpha) / FADE_MAX) * 100);
+        let trailText = fadeAlpha === 0 ? "Trail: 100% (Infinite)" : `Trail: ${persistence}%`;
+        
+        let line1 = `Up: ${upCount}    Down: ${downCount}`;
+        let line2 = `${trailText}    TickHeight: ${tickHeight.toFixed(1)}`;
+
+        let w = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width) + hudPad * 2;
+        let h = hudTextSize * 2 + hudPad * 3;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.66)';
+        ctx.beginPath(); ctx.roundRect(hudPad, hudPad, w, h, hudPad * 0.5); ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textBaseline = 'top';
+        ctx.fillText(line1, hudPad * 2, hudPad + hudPad * 0.5);
+        ctx.fillText(line2, hudPad * 2, hudPad + hudTextSize + hudPad);
+    }
+
+    function drawMouseDiagram() {
+        let margin = Math.max(hudPad * 2, 12);
+        let H = Math.min(canvas.width, canvas.height);
+        let mouseW = Math.max(90, H * 0.14);
+        let mouseH = mouseW * 1.5;
+        let xRight = canvas.width - margin;
+        let yTop = margin;
+        let mx = xRight - mouseW;
+        let my = yTop;
+        let radius = mouseW * 0.30;
+
+        ctx.fillStyle = 'rgba(20, 20, 20, 0.78)';
+        ctx.beginPath(); ctx.roundRect(mx, my, mouseW, mouseH, radius); ctx.fill();
+
+        let safeInset = Math.max(mouseW * 0.10, radius * 0.35);
+        let rowTop = my + safeInset;
+        let rowPadX = safeInset;
+        let rowW = mouseW - rowPadX * 2;
+        let rowH = mouseH * 0.26;
+        let gap = rowW * 0.06;
+        let midW = rowW * 0.20;
+        let lrW = (rowW - midW - 2 * gap) / 2;
+
+        let lx = mx + rowPadX;
+        let mxr = lx + lrW + gap;
+        let rx = mxr + midW + gap;
+        let ly = rowTop;
+        let br = radius * 0.22;
+
+        drawButton(lx, ly, lrW, rowH, leftHeld, leftFlash, leftDblFlash, br);
+        drawButton(mxr, ly, midW, rowH, middleHeld, midFlash, midDblFlash, br * 0.8);
+        drawButton(rx, ly, lrW, rowH, rightHeld, rightFlash, rightDblFlash, br);
+
+        drawHoldBadge(lx, ly, lrW, rowH, leftHeldMs, leftHeld);
+        drawHoldBadge(mxr, ly, midW, rowH, midHeldMs, middleHeld);
+        drawHoldBadge(rx, ly, lrW, rowH, rightHeldMs, rightHeld);
+
+        // Wheel slit
+        let notchX = mxr + midW / 2;
+        if (wheelPulseFrames > 0) {
+            let a = wheelPulseFrames / 30;
+            ctx.strokeStyle = wheelDir > 0 ? `rgba(0, 255, 0, ${a})` : `rgba(255, 0, 0, ${a})`;
+        } else {
+            ctx.strokeStyle = '#787878';
+        }
+        ctx.lineWidth = Math.max(1, strokeW * 0.9);
+        ctx.beginPath(); ctx.moveTo(notchX, ly + rowH * 0.18); ctx.lineTo(notchX, ly + rowH * 0.82); ctx.stroke();
+
+        ctx.font = `${hudTextSize * 0.8}px monospace`;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.fillText("Mouse", mx + mouseW / 2, my + mouseH - safeInset);
+
+        let dblAny = Math.max(leftDblFlash, midDblFlash, rightDblFlash);
+        if (dblAny > 0) {
+            ctx.fillStyle = `rgba(0, 255, 255, ${dblAny / DBL_FLASH_FRAMES})`;
+            ctx.fillText("Double-Click!", mx + mouseW / 2, my + mouseH + hudPad);
+        }
+        ctx.textAlign = 'left'; // reset
+    }
+
+    function drawButton(x, y, w, h, isHeld, flashFrames, dblFrames, r) {
+        ctx.fillStyle = isHeld ? 'rgba(255, 255, 255, 0.9)' : 'rgba(60, 60, 60, 0.86)';
+        ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
+
+        if (flashFrames > 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${(flashFrames / FLASH_FRAMES) * 0.7})`;
+            ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill();
+        }
+        if (dblFrames > 0) {
+            ctx.strokeStyle = `rgba(0, 180, 255, ${dblFrames / DBL_FLASH_FRAMES})`;
+            ctx.lineWidth = Math.max(2, strokeW * 1.6);
+            ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.stroke();
+        }
+    }
+
+    function drawHoldBadge(bx, by, bw, bh, ms, show) {
+        if (!show || ms <= 0) return;
+        let baseSize = Math.min(bh * 0.35, hudTextSize);
+        ctx.font = `${baseSize}px monospace`;
+        ctx.textAlign = 'center';
+
+        let s = ms + " ms";
+        let pad = bh * 0.10;
+        let cx = bx + bw * 0.5;
+        let ty = by + bh * 0.08;
+
+        let tw = ctx.measureText(s).width;
+        let th = baseSize; // approximation
+        let pillW = tw + pad * 2;
+        let pillH = th + pad * 1.5;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.beginPath(); ctx.roundRect(cx - pillW/2, ty, pillW, pillH, pillH * 0.5); ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(s, cx, ty + pad);
+        ctx.textAlign = 'left'; // reset
+    }
+
+    // Initialize and Start
+    setup();
+    requestAnimationFrame(draw);
+    window.addEventListener('resize', setup);
+</script>
+</body>
 </html>
