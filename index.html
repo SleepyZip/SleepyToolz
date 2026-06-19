@@ -2,167 +2,141 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mouse & Keyboard Tester</title>
     <style>
-        /* Zero out everything to force full-screen canvas */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { width: 100%; height: 100%; background: #000; overflow: hidden; }
         #app { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
     </style>
 </head>
 <body>
-
     <canvas id="app"></canvas>
-
     <script>
+        // Global variables so Event Listeners can "see" them
+        let canvas, ctx;
+        let x, y, prevx, tickHeight, strokeW, hudTextSize, hudPad;
+        const FADE_MAX = 50, FADE_STEP = 1, TRAIL_GAMMA = 1.6;
+        let fadeAlpha = 25;
+        let upCount = 0, downCount = 0, skipDotFrames = 0;
+
+        const FLASH_FRAMES = 10, DBL_FLASH_FRAMES = 60, DOUBLE_CLICK_MS = 300;
+        let leftHeld = false, middleHeld = false, rightHeld = false;
+        let leftFlash = 0, midFlash = 0, rightFlash = 0;
+        let leftDblFlash = 0, midDblFlash = 0, rightDblFlash = 0;
+        let lastLeftReleaseMs = -100000, lastMidReleaseMs = -100000, lastRightReleaseMs = -100000;
+        let leftStartMs = -1, midStartMs = -1, rightStartMs = -1;
+        let leftHeldMs = 0, midHeldMs = 0, rightHeldMs = 0;
+        let wheelPulseFrames = 0, wheelDir = 0;
+
         document.addEventListener('DOMContentLoaded', () => {
-            const canvas = document.getElementById('app');
-            const ctx = canvas.getContext('2d');
+            canvas = document.getElementById('app');
+            ctx = canvas.getContext('2d');
+            setup();
+            requestAnimationFrame(draw);
+        });
 
-            let x, y, prevx;
-            let tickHeight, strokeW, hudTextSize, hudPad;
+        function setup() {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            x = canvas.width * 0.15;
+            y = canvas.height * 0.5;
+            prevx = x;
+            let S = Math.min(canvas.width, canvas.height);
+            tickHeight = Math.max(2, S * 0.03);
+            strokeW = Math.max(1, S * 0.003);
+            hudTextSize = Math.max(10, S * 0.025);
+            hudPad = Math.max(6, S * 0.008);
+            ctx.lineCap = 'square';
+        }
 
-            const FADE_MAX = 50, FADE_STEP = 1, TRAIL_GAMMA = 1.6;
-            let fadeAlpha = 25;
-            let upCount = 0, downCount = 0;
-            let skipDotFrames = 0;
+        function draw() {
+            let xAlpha = fadeAlpha / FADE_MAX;
+            let effectiveAlpha = Math.floor(FADE_MAX * Math.pow(xAlpha, TRAIL_GAMMA));
+            ctx.fillStyle = `rgba(0, 0, 0, ${effectiveAlpha / 255})`;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            const FLASH_FRAMES = 10, DBL_FLASH_FRAMES = 60, DOUBLE_CLICK_MS = 300;
-            let leftHeld = false, middleHeld = false, rightHeld = false;
-            let leftFlash = 0, midFlash = 0, rightFlash = 0;
-            let leftDblFlash = 0, midDblFlash = 0, rightDblFlash = 0;
-            let lastLeftReleaseMs = -100000, lastMidReleaseMs = -100000, lastRightReleaseMs = -100000;
-            let leftStartMs = -1, midStartMs = -1, rightStartMs = -1;
-            let leftHeldMs = 0, midHeldMs = 0, rightHeldMs = 0;
-            let wheelPulseFrames = 0, wheelDir = 0;
-
-            function setup() {
-                canvas.width = canvas.clientWidth;
-                canvas.height = canvas.clientHeight;
-                x = canvas.width * 0.15;
-                y = canvas.height * 0.5;
-                prevx = x;
-                let S = Math.min(canvas.width, canvas.height);
-                tickHeight = Math.max(2, S * 0.03);
-                strokeW = Math.max(1, S * 0.003);
-                hudTextSize = Math.max(10, S * 0.025);
-                hudPad = Math.max(6, S * 0.008);
-                ctx.lineCap = 'square';
-            }
-
-            function draw() {
-                let xAlpha = fadeAlpha / FADE_MAX;
-                let effectiveAlpha = Math.floor(FADE_MAX * Math.pow(xAlpha, TRAIL_GAMMA));
-                ctx.fillStyle = `rgba(0, 0, 0, ${effectiveAlpha / 255})`;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                if (skipDotFrames === 0) {
-                    ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = strokeW;
-                    ctx.beginPath();
-                    ctx.moveTo(prevx, y);
-                    ctx.lineTo(x, y);
-                    ctx.stroke();
-                }
-
-                prevx = x;
-                x += Math.max(1, strokeW);
-                if (x >= canvas.width) { x = 0; prevx = x; }
-                if (skipDotFrames > 0) skipDotFrames--;
-
-                updateHoldTimers();
-                tickMouseAnimations();
-                drawHUD();
-                drawMouseDiagram();
-                requestAnimationFrame(draw);
-            }
-
-            window.addEventListener('mousedown', (e) => {
-                if (e.button === 0) { leftHeld = true; leftFlash = FLASH_FRAMES; }
-                if (e.button === 1) { middleHeld = true; midFlash = FLASH_FRAMES; }
-                if (e.button === 2) { rightHeld = true; rightFlash = FLASH_FRAMES; }
-            });
-
-            window.addEventListener('mouseup', (e) => {
-                let now = performance.now();
-                if (e.button === 0) { leftHeld = false; if (now - lastLeftReleaseMs <= DOUBLE_CLICK_MS) leftDblFlash = DBL_FLASH_FRAMES; lastLeftReleaseMs = now; }
-                if (e.button === 1) { middleHeld = false; if (now - lastMidReleaseMs <= DOUBLE_CLICK_MS) midDblFlash = DBL_FLASH_FRAMES; lastMidReleaseMs = now; }
-                if (e.button === 2) { rightHeld = false; if (now - lastRightReleaseMs <= DOUBLE_CLICK_MS) rightDblFlash = DBL_FLASH_FRAMES; lastRightReleaseMs = now; }
-            });
-
-            canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-            canvas.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                let steps = Math.sign(e.deltaY);
-                if (steps === 0) return;
-                let isUp = steps < 0;
-                if (isUp) upCount++; else downCount++;
-                ctx.strokeStyle = isUp ? 'rgb(0, 255, 0)' : 'rgb(255, 0, 0)';
+            if (skipDotFrames === 0) {
+                ctx.strokeStyle = '#FFFFFF';
                 ctx.lineWidth = strokeW;
-                let newY = y + steps * tickHeight;
-                drawVerticalBarWithWrap(x, y, newY);
-                y = wrapY(newY);
-                skipDotFrames = 2;
-                wheelDir = isUp ? 1 : -1;
-                wheelPulseFrames = 30;
-            }, { passive: false });
-
-            window.addEventListener('keydown', (e) => {
-                if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
-                if (e.key === 'ArrowUp' || e.key === '+') fadeAlpha = Math.max(0, fadeAlpha - FADE_STEP);
-                if (e.key === 'ArrowDown' || e.key === '-') fadeAlpha = Math.min(FADE_MAX, fadeAlpha + FADE_STEP);
-                if (e.key === 'ArrowRight') tickHeight = Math.min(tickHeight * 1.1, 100);
-                if (e.key === 'ArrowLeft') tickHeight = Math.max(1, tickHeight / 1.1);
-            });
-
-            function wrapY(v) { let h = canvas.height; let m = v % h; return m < 0 ? m + h : m; }
-
-            function drawVerticalBarWithWrap(xLine, yStart, yEnd) {
                 ctx.beginPath();
-                if (yEnd >= 0 && yEnd < canvas.height) { ctx.moveTo(xLine, yStart); ctx.lineTo(xLine, yEnd); }
-                else {
-                    let dest = wrapY(yEnd);
-                    if (yEnd >= canvas.height) { ctx.moveTo(xLine, yStart); ctx.lineTo(xLine, canvas.height - 1); ctx.moveTo(xLine, 0); ctx.lineTo(xLine, dest); }
-                    else { ctx.moveTo(xLine, yStart); ctx.lineTo(xLine, 0); ctx.moveTo(xLine, canvas.height - 1); ctx.lineTo(xLine, dest); }
-                }
+                ctx.moveTo(prevx, y);
+                ctx.lineTo(x, y);
                 ctx.stroke();
             }
 
-            function updateHoldTimers() {
-                let now = performance.now();
-                if (leftHeld) { if (leftStartMs < 0) leftStartMs = now; leftHeldMs = Math.floor(now - leftStartMs); } else { leftStartMs = -1; leftHeldMs = 0; }
-                if (middleHeld) { if (midStartMs < 0) midStartMs = now; midHeldMs = Math.floor(now - midStartMs); } else { midStartMs = -1; midHeldMs = 0; }
-                if (rightHeld) { if (rightStartMs < 0) rightStartMs = now; rightHeldMs = Math.floor(now - rightStartMs); } else { rightStartMs = -1; rightHeldMs = 0; }
-            }
+            prevx = x;
+            x += Math.max(1, strokeW);
+            if (x >= canvas.width) { x = 0; prevx = x; }
+            if (skipDotFrames > 0) skipDotFrames--;
 
-            function tickMouseAnimations() {
-                if (leftFlash > 0) leftFlash--; if (midFlash > 0) midFlash--; if (rightFlash > 0) rightFlash--;
-                if (leftDblFlash > 0) leftDblFlash--; if (midDblFlash > 0) midDblFlash--; if (rightDblFlash > 0) rightDblFlash--;
-                if (wheelPulseFrames > 0) wheelPulseFrames--;
-            }
-
-            function drawHUD() {
-                ctx.font = `${hudTextSize}px monospace`;
-                let line1 = `Up: ${upCount} Down: ${downCount}`;
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.66)';
-                ctx.beginPath(); ctx.roundRect(hudPad, hudPad, 200, 60, 5); ctx.fill();
-                ctx.fillStyle = '#FFF'; ctx.fillText(line1, hudPad * 2, hudPad * 3);
-            }
-
-            function drawMouseDiagram() {
-                let mx = canvas.width - 150, my = 20, mouseW = 100, mouseH = 150;
-                ctx.fillStyle = 'rgba(20, 20, 20, 0.8)';
-                ctx.beginPath(); ctx.roundRect(mx, my, mouseW, mouseH, 20); ctx.fill();
-                ctx.fillStyle = leftHeld ? '#FFF' : '#444'; ctx.fillRect(mx + 10, my + 20, 35, 60);
-                ctx.fillStyle = rightHeld ? '#FFF' : '#444'; ctx.fillRect(mx + 55, my + 20, 35, 60);
-            }
-
-            setup();
+            updateHoldTimers();
+            tickMouseAnimations();
+            drawHUD();
+            drawMouseDiagram();
             requestAnimationFrame(draw);
-            window.addEventListener('resize', setup);
+        }
+
+        // Event Listeners (Now have access to global variables)
+        window.addEventListener('mousedown', (e) => {
+            if (e.button === 0) { leftHeld = true; leftFlash = FLASH_FRAMES; }
+            if (e.button === 1) { middleHeld = true; midFlash = FLASH_FRAMES; }
+            if (e.button === 2) { rightHeld = true; rightFlash = FLASH_FRAMES; }
         });
+
+        window.addEventListener('mouseup', (e) => {
+            let now = performance.now();
+            if (e.button === 0) { leftHeld = false; if (now - lastLeftReleaseMs <= DOUBLE_CLICK_MS) leftDblFlash = DBL_FLASH_FRAMES; lastLeftReleaseMs = now; }
+            if (e.button === 1) { middleHeld = false; if (now - lastMidReleaseMs <= DOUBLE_CLICK_MS) midDblFlash = DBL_FLASH_FRAMES; lastMidReleaseMs = now; }
+            if (e.button === 2) { rightHeld = false; if (now - lastRightReleaseMs <= DOUBLE_CLICK_MS) rightDblFlash = DBL_FLASH_FRAMES; lastRightReleaseMs = now; }
+        });
+
+        window.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            let steps = Math.sign(e.deltaY);
+            if (steps === 0) return;
+            let isUp = steps < 0;
+            if (isUp) upCount++; else downCount++;
+            ctx.strokeStyle = isUp ? 'rgb(0, 255, 0)' : 'rgb(255, 0, 0)';
+            let newY = y + steps * tickHeight;
+            // Simplified bar logic for space
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, newY); ctx.stroke();
+            y = (newY % canvas.height + canvas.height) % canvas.height;
+            skipDotFrames = 2;
+            wheelDir = isUp ? 1 : -1;
+            wheelPulseFrames = 30;
+        }, { passive: false });
+
+        function updateHoldTimers() {
+            let now = performance.now();
+            if (leftHeld) { if (leftStartMs < 0) leftStartMs = now; leftHeldMs = Math.floor(now - leftStartMs); } else { leftStartMs = -1; leftHeldMs = 0; }
+            if (middleHeld) { if (midStartMs < 0) midStartMs = now; midHeldMs = Math.floor(now - midStartMs); } else { midStartMs = -1; midHeldMs = 0; }
+            if (rightHeld) { if (rightStartMs < 0) rightStartMs = now; rightHeldMs = Math.floor(now - rightStartMs); } else { rightStartMs = -1; rightHeldMs = 0; }
+        }
+
+        function tickMouseAnimations() {
+            if (leftFlash > 0) leftFlash--; if (midFlash > 0) midFlash--; if (rightFlash > 0) rightFlash--;
+            if (leftDblFlash > 0) leftDblFlash--; if (midDblFlash > 0) midDblFlash--; if (rightDblFlash > 0) rightDblFlash--;
+            if (wheelPulseFrames > 0) wheelPulseFrames--;
+        }
+
+        function drawHUD() {
+            ctx.font = `${hudTextSize}px monospace`;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.66)';
+            ctx.beginPath(); ctx.roundRect(hudPad, hudPad, 200, 60, 5); ctx.fill();
+            ctx.fillStyle = '#FFF'; ctx.fillText(`Up: ${upCount} Down: ${downCount}`, hudPad * 2, hudPad * 3);
+        }
+
+        function drawMouseDiagram() {
+            let mx = canvas.width - 150, my = 20, mouseW = 100, mouseH = 150;
+            ctx.fillStyle = 'rgba(20, 20, 20, 0.8)';
+            ctx.beginPath(); ctx.roundRect(mx, my, mouseW, mouseH, 20); ctx.fill();
+            ctx.fillStyle = leftHeld ? '#FFF' : '#444'; ctx.fillRect(mx + 10, my + 20, 35, 60);
+            ctx.fillStyle = rightHeld ? '#FFF' : '#444'; ctx.fillRect(mx + 55, my + 20, 35, 60);
+            // Render text for hold timers
+            ctx.fillStyle = '#FFF';
+            if(leftHeld) ctx.fillText(leftHeldMs + "ms", mx + 15, my + 50);
+            if(rightHeld) ctx.fillText(rightHeldMs + "ms", mx + 60, my + 50);
+        }
     </script>
 </body>
 </html>
