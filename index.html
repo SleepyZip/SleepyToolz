@@ -14,7 +14,7 @@
     <script>
         let canvas, ctx;
         let leftHeld = false, midHeld = false, rightHeld = false;
-        let x, y, prevx, tickHeight = 10, scrollColor = '#787878';
+        let x, y, prevx, scrollColor = '#787878';
 
         document.addEventListener('DOMContentLoaded', () => {
             canvas = document.getElementById('app');
@@ -24,25 +24,23 @@
             canvas.height = window.innerHeight * dpr;
             ctx.scale(dpr, dpr);
             
-            x = window.innerWidth * 0.1;
-            y = window.innerHeight * 0.5;
-            prevx = x;
-            
+            x = 0; y = window.innerHeight * 0.5; prevx = x;
             canvas.addEventListener('contextmenu', (e) => e.preventDefault());
             requestAnimationFrame(draw);
         });
 
         function draw() {
-            // Fade effect
+            // Fade effect for the trail
             ctx.fillStyle = 'rgba(0,0,0,0.1)';
             ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
             
-            // Draw Line
+            // Draw Tracer Line
             ctx.strokeStyle = '#FFF';
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(prevx, y); ctx.lineTo(x, y); ctx.stroke();
             
-            prevx = x; x += 2;
+            // Update line position
+            prevx = x; x += 3;
             if(x > window.innerWidth) { x = 0; prevx = x; }
 
             // Diagram Container
@@ -81,8 +79,7 @@
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
             scrollColor = e.deltaY < 0 ? '#8ef79f' : '#ff8e8e';
-            y = (y + e.deltaY * 0.1) % window.innerHeight;
-            if(y < 0) y += window.innerHeight;
+            y = Math.min(Math.max(y + e.deltaY * 0.2, 0), window.innerHeight);
             setTimeout(() => { scrollColor = '#787878'; }, 300);
         }, { passive: false });
     </script>
