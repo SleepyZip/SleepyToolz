@@ -14,7 +14,8 @@
     <script>
         let canvas, ctx;
         let leftHeld = false, midHeld = false, rightHeld = false;
-        let x, y, prevx, scrollColor = '#787878';
+        let leftStartMs = -1, rightStartMs = -1;
+        let x = 0, y, prevx, scrollDirColor = '#444';
 
         document.addEventListener('DOMContentLoaded', () => {
             canvas = document.getElementById('app');
@@ -24,23 +25,22 @@
             canvas.height = window.innerHeight * dpr;
             ctx.scale(dpr, dpr);
             
-            x = 0; y = window.innerHeight * 0.5; prevx = x;
+            y = window.innerHeight * 0.5;
+            prevx = x;
             canvas.addEventListener('contextmenu', (e) => e.preventDefault());
             requestAnimationFrame(draw);
         });
 
         function draw() {
-            // Fade effect for the trail
+            // Trail effect
             ctx.fillStyle = 'rgba(0,0,0,0.1)';
             ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
             
-            // Draw Tracer Line
+            // Smoothed Tracer Line
             ctx.strokeStyle = '#FFF';
             ctx.lineWidth = 2;
             ctx.beginPath(); ctx.moveTo(prevx, y); ctx.lineTo(x, y); ctx.stroke();
-            
-            // Update line position
-            prevx = x; x += 3;
+            prevx = x; x += 4;
             if(x > window.innerWidth) { x = 0; prevx = x; }
 
             // Diagram Container
@@ -48,26 +48,29 @@
             ctx.fillStyle = '#1a1a1a';
             ctx.beginPath(); ctx.roundRect(mx, my, 160, 150, 10); ctx.fill();
             
-            // Buttons
+            // Left/Right Buttons
             ctx.fillStyle = leftHeld ? '#FFF' : '#444';
             ctx.fillRect(mx + 15, my + 30, 40, 70);
-            ctx.fillStyle = midHeld ? '#FFF' : '#444';
-            ctx.fillRect(mx + 60, my + 30, 40, 70);
             ctx.fillStyle = rightHeld ? '#FFF' : '#444';
             ctx.fillRect(mx + 105, my + 30, 40, 70);
             
-            // Scroll Indicator
-            ctx.strokeStyle = scrollColor;
-            ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.moveTo(mx + 80, my + 110); ctx.lineTo(mx + 80, my + 140); ctx.stroke();
+            // Middle Button: Dynamic Scroll Wheel Color
+            ctx.fillStyle = scrollDirColor;
+            ctx.beginPath(); ctx.roundRect(mx + 60, my + 30, 40, 70, 20); ctx.fill();
+            
+            // Timers
+            ctx.fillStyle = '#8ef79f'; ctx.font = '12px monospace';
+            ctx.fillText("L:" + (leftHeld ? (performance.now() - leftStartMs).toFixed(0) + "ms" : "0ms"), mx + 15, my + 180);
+            ctx.fillStyle = '#ff8e8e';
+            ctx.fillText("R:" + (rightHeld ? (performance.now() - rightStartMs).toFixed(0) + "ms" : "0ms"), mx + 105, my + 180);
             
             requestAnimationFrame(draw);
         }
 
         window.addEventListener('mousedown', (e) => {
-            if (e.button === 0) leftHeld = true;
+            if (e.button === 0) { leftHeld = true; leftStartMs = performance.now(); }
             if (e.button === 1) midHeld = true;
-            if (e.button === 2) rightHeld = true;
+            if (e.button === 2) { rightHeld = true; rightStartMs = performance.now(); }
         });
 
         window.addEventListener('mouseup', (e) => {
@@ -78,9 +81,12 @@
 
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
-            scrollColor = e.deltaY < 0 ? '#8ef79f' : '#ff8e8e';
-            y = Math.min(Math.max(y + e.deltaY * 0.2, 0), window.innerHeight);
-            setTimeout(() => { scrollColor = '#787878'; }, 300);
+            // Scroll Up = Green, Down = Red
+            scrollDirColor = e.deltaY < 0 ? '#8ef79f' : '#ff8e8e';
+            y = Math.min(Math.max(y + e.deltaY * 0.5, 50), window.innerHeight - 50);
+            
+            // Fade color back to gray after scroll
+            setTimeout(() => { scrollDirColor = '#444'; }, 200);
         }, { passive: false });
     </script>
 </body>
