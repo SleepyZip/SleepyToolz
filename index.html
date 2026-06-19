@@ -6,7 +6,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { width: 100%; height: 100%; background: #000; overflow: hidden; }
-        /* This prevents browser zoom blur */
+        /* Disable touch zoom to keep text sharp */
         #app { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: crosshair; }
     </style>
 </head>
@@ -22,7 +22,7 @@
             canvas = document.getElementById('app');
             ctx = canvas.getContext('2d');
             
-            // Handle High-DPI screens for crisp text
+            // Fix blur: Match canvas internal size to physical screen pixels
             const dpr = window.devicePixelRatio || 1;
             canvas.width = window.innerWidth * dpr;
             canvas.height = window.innerHeight * dpr;
@@ -32,11 +32,10 @@
         });
 
         function draw() {
-            // Clear screen
             ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            // Mouse Diagram Container
+            // Draw Mouse Diagram Area
             const mx = (window.innerWidth - 160), my = 20;
             ctx.fillStyle = '#1a1a1a';
             ctx.beginPath(); ctx.roundRect(mx, my, 120, 150, 10); ctx.fill();
@@ -47,16 +46,12 @@
             ctx.fillStyle = rightHeld ? '#FFF' : '#444';
             ctx.fillRect(mx + 65, my + 30, 40, 70);
             
-            // Crisp Text Rendering
-            ctx.textBaseline = 'top';
-            ctx.font = 'bold 12px monospace';
-            
-            // Timers positioned clearly below
+            // Data HUD (Below Mouse)
+            ctx.font = '14px monospace';
             ctx.fillStyle = '#8ef79f';
-            ctx.fillText("L: " + (leftHeld ? (performance.now() - leftStartMs).toFixed(0) + "ms" : "0ms"), mx, my + 165);
-            
+            ctx.fillText("L: " + (leftHeld ? (performance.now() - leftStartMs).toFixed(0) + "ms" : "0ms"), mx, my + 170);
             ctx.fillStyle = '#ff8e8e';
-            ctx.fillText("R: " + (rightHeld ? (performance.now() - rightStartMs).toFixed(0) + "ms" : "0ms"), mx + 65, my + 165);
+            ctx.fillText("R: " + (rightHeld ? (performance.now() - rightStartMs).toFixed(0) + "ms" : "0ms"), mx + 65, my + 170);
             
             requestAnimationFrame(draw);
         }
@@ -73,9 +68,6 @@
 
         // Block Right Click Menu
         window.addEventListener('contextmenu', (e) => e.preventDefault());
-        
-        // Ensure focus
-        window.addEventListener('mousedown', () => window.focus());
     </script>
 </body>
 </html>
