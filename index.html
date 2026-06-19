@@ -117,23 +117,29 @@
             ctx.fillText(`Scrolls: ${upCount + downCount}`, 20, 30);
         }
 
-        function drawMouseDiagram() {
-            let mx = canvas.width - 160, my = 20, mouseW = 120, mouseH = 180;
+function drawMouseDiagram() {
+            let mx = canvas.width - 160, my = 20, mouseW = 120, mouseH = 150;
+            
+            // 1. Draw Mouse Body
             ctx.fillStyle = 'rgba(20, 20, 20, 0.8)';
             ctx.beginPath(); ctx.roundRect(mx, my, mouseW, mouseH, 20); ctx.fill();
             
-            // Buttons
+            // 2. Draw Buttons
             ctx.fillStyle = leftHeld ? '#FFF' : '#444'; 
             ctx.fillRect(mx + 15, my + 30, 40, 70);
             ctx.fillStyle = rightHeld ? '#FFF' : '#444'; 
             ctx.fillRect(mx + 65, my + 30, 40, 70);
 
-            // Timers floating above diagram
-            ctx.font = '14px monospace';
+            // 3. Dedicated Data HUD (Below the Mouse)
+            let hudY = my + mouseH + 10;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+            ctx.fillRect(mx, hudY, mouseW, 40);
+            
+            ctx.font = '12px monospace';
             ctx.fillStyle = '#8ef79f'; 
-            ctx.fillText("L: " + (leftHeld ? leftHeldMs + "ms" : "0ms"), mx, my - 5);
+            ctx.fillText("L: " + (leftHeld ? leftHeldMs + "ms" : "0ms"), mx + 10, hudY + 25);
             ctx.fillStyle = '#ff8e8e'; 
-            ctx.fillText("R: " + (rightHeld ? rightHeldMs + "ms" : "0ms"), mx + 65, my - 5);
+            ctx.fillText("R: " + (rightHeld ? rightHeldMs + "ms" : "0ms"), mx + 70, hudY + 25);
         }
     </script>
 </body>
