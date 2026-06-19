@@ -12,7 +12,6 @@
 <body>
     <canvas id="app"></canvas>
     <script>
-        // Global variables so Event Listeners can "see" them
         let canvas, ctx;
         let x, y, prevx, tickHeight, strokeW, hudTextSize, hudPad;
         const FADE_MAX = 50, FADE_STEP = 1, TRAIL_GAMMA = 1.6;
@@ -26,7 +25,6 @@
         let lastLeftReleaseMs = -100000, lastMidReleaseMs = -100000, lastRightReleaseMs = -100000;
         let leftStartMs = -1, midStartMs = -1, rightStartMs = -1;
         let leftHeldMs = 0, midHeldMs = 0, rightHeldMs = 0;
-        let wheelPulseFrames = 0, wheelDir = 0;
 
         document.addEventListener('DOMContentLoaded', () => {
             canvas = document.getElementById('app');
@@ -63,7 +61,6 @@
                 ctx.lineTo(x, y);
                 ctx.stroke();
             }
-
             prevx = x;
             x += Math.max(1, strokeW);
             if (x >= canvas.width) { x = 0; prevx = x; }
@@ -76,7 +73,6 @@
             requestAnimationFrame(draw);
         }
 
-        // Event Listeners (Now have access to global variables)
         window.addEventListener('mousedown', (e) => {
             if (e.button === 0) { leftHeld = true; leftFlash = FLASH_FRAMES; }
             if (e.button === 1) { middleHeld = true; midFlash = FLASH_FRAMES; }
@@ -98,44 +94,46 @@
             if (isUp) upCount++; else downCount++;
             ctx.strokeStyle = isUp ? 'rgb(0, 255, 0)' : 'rgb(255, 0, 0)';
             let newY = y + steps * tickHeight;
-            // Simplified bar logic for space
             ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, newY); ctx.stroke();
             y = (newY % canvas.height + canvas.height) % canvas.height;
             skipDotFrames = 2;
-            wheelDir = isUp ? 1 : -1;
-            wheelPulseFrames = 30;
         }, { passive: false });
 
         function updateHoldTimers() {
             let now = performance.now();
-            if (leftHeld) { if (leftStartMs < 0) leftStartMs = now; leftHeldMs = Math.floor(now - leftStartMs); } else { leftStartMs = -1; leftHeldMs = 0; }
-            if (middleHeld) { if (midStartMs < 0) midStartMs = now; midHeldMs = Math.floor(now - midStartMs); } else { midStartMs = -1; midHeldMs = 0; }
-            if (rightHeld) { if (rightStartMs < 0) rightStartMs = now; rightHeldMs = Math.floor(now - rightStartMs); } else { rightStartMs = -1; rightHeldMs = 0; }
+            leftHeldMs = leftHeld ? Math.floor(now - (leftStartMs < 0 ? (leftStartMs = now) : leftStartMs)) : 0;
+            rightHeldMs = rightHeld ? Math.floor(now - (rightStartMs < 0 ? (rightStartMs = now) : rightStartMs)) : 0;
+            if(!leftHeld) leftStartMs = -1;
+            if(!rightHeld) rightStartMs = -1;
         }
 
         function tickMouseAnimations() {
-            if (leftFlash > 0) leftFlash--; if (midFlash > 0) midFlash--; if (rightFlash > 0) rightFlash--;
-            if (leftDblFlash > 0) leftDblFlash--; if (midDblFlash > 0) midDblFlash--; if (rightDblFlash > 0) rightDblFlash--;
-            if (wheelPulseFrames > 0) wheelPulseFrames--;
+            if (leftFlash > 0) leftFlash--; if (rightFlash > 0) rightFlash--;
         }
 
         function drawHUD() {
-            ctx.font = `${hudTextSize}px monospace`;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.66)';
-            ctx.beginPath(); ctx.roundRect(hudPad, hudPad, 200, 60, 5); ctx.fill();
-            ctx.fillStyle = '#FFF'; ctx.fillText(`Up: ${upCount} Down: ${downCount}`, hudPad * 2, hudPad * 3);
+            ctx.font = '14px monospace';
+            ctx.fillStyle = '#FFF';
+            ctx.fillText(`Scrolls: ${upCount + downCount}`, 20, 30);
         }
 
         function drawMouseDiagram() {
-            let mx = canvas.width - 150, my = 20, mouseW = 100, mouseH = 150;
+            let mx = canvas.width - 160, my = 20, mouseW = 120, mouseH = 180;
             ctx.fillStyle = 'rgba(20, 20, 20, 0.8)';
             ctx.beginPath(); ctx.roundRect(mx, my, mouseW, mouseH, 20); ctx.fill();
-            ctx.fillStyle = leftHeld ? '#FFF' : '#444'; ctx.fillRect(mx + 10, my + 20, 35, 60);
-            ctx.fillStyle = rightHeld ? '#FFF' : '#444'; ctx.fillRect(mx + 55, my + 20, 35, 60);
-            // Render text for hold timers
-            ctx.fillStyle = '#FFF';
-            if(leftHeld) ctx.fillText(leftHeldMs + "ms", mx + 15, my + 50);
-            if(rightHeld) ctx.fillText(rightHeldMs + "ms", mx + 60, my + 50);
+            
+            // Buttons
+            ctx.fillStyle = leftHeld ? '#FFF' : '#444'; 
+            ctx.fillRect(mx + 15, my + 30, 40, 70);
+            ctx.fillStyle = rightHeld ? '#FFF' : '#444'; 
+            ctx.fillRect(mx + 65, my + 30, 40, 70);
+
+            // Timers floating above diagram
+            ctx.font = '14px monospace';
+            ctx.fillStyle = '#8ef79f'; 
+            ctx.fillText("L: " + (leftHeld ? leftHeldMs + "ms" : "0ms"), mx, my - 5);
+            ctx.fillStyle = '#ff8e8e'; 
+            ctx.fillText("R: " + (rightHeld ? rightHeldMs + "ms" : "0ms"), mx + 65, my - 5);
         }
     </script>
 </body>
