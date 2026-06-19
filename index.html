@@ -14,40 +14,51 @@
     <script>
         let canvas, ctx;
         let leftHeld = false, midHeld = false, rightHeld = false;
-        let scrollColor = '#787878'; // Neutral gray
+        let x, y, prevx, tickHeight = 10, scrollColor = '#787878';
 
         document.addEventListener('DOMContentLoaded', () => {
             canvas = document.getElementById('app');
             ctx = canvas.getContext('2d');
-            
             const dpr = window.devicePixelRatio || 1;
             canvas.width = window.innerWidth * dpr;
             canvas.height = window.innerHeight * dpr;
             ctx.scale(dpr, dpr);
             
-            // Block context menu specifically on the canvas
+            x = window.innerWidth * 0.1;
+            y = window.innerHeight * 0.5;
+            prevx = x;
+            
             canvas.addEventListener('contextmenu', (e) => e.preventDefault());
             requestAnimationFrame(draw);
         });
 
         function draw() {
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Fade effect
+            ctx.fillStyle = 'rgba(0,0,0,0.1)';
+            ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
             
+            // Draw Line
+            ctx.strokeStyle = '#FFF';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(prevx, y); ctx.lineTo(x, y); ctx.stroke();
+            
+            prevx = x; x += 2;
+            if(x > window.innerWidth) { x = 0; prevx = x; }
+
             // Diagram Container
             const mx = (window.innerWidth - 200), my = 20;
             ctx.fillStyle = '#1a1a1a';
             ctx.beginPath(); ctx.roundRect(mx, my, 160, 150, 10); ctx.fill();
             
-            // Buttons: Left, Middle, Right
+            // Buttons
             ctx.fillStyle = leftHeld ? '#FFF' : '#444';
-            ctx.fillRect(mx + 15, my + 30, 40, 70); // Left
+            ctx.fillRect(mx + 15, my + 30, 40, 70);
             ctx.fillStyle = midHeld ? '#FFF' : '#444';
-            ctx.fillRect(mx + 60, my + 30, 40, 70); // Middle
+            ctx.fillRect(mx + 60, my + 30, 40, 70);
             ctx.fillStyle = rightHeld ? '#FFF' : '#444';
-            ctx.fillRect(mx + 105, my + 30, 40, 70); // Right
+            ctx.fillRect(mx + 105, my + 30, 40, 70);
             
-            // Scroll Indicator (The "Slit")
+            // Scroll Indicator
             ctx.strokeStyle = scrollColor;
             ctx.lineWidth = 4;
             ctx.beginPath(); ctx.moveTo(mx + 80, my + 110); ctx.lineTo(mx + 80, my + 140); ctx.stroke();
@@ -69,9 +80,9 @@
 
         window.addEventListener('wheel', (e) => {
             e.preventDefault();
-            // Green for Up (negative), Red for Down (positive)
             scrollColor = e.deltaY < 0 ? '#8ef79f' : '#ff8e8e';
-            // Reset color to gray after 300ms
+            y = (y + e.deltaY * 0.1) % window.innerHeight;
+            if(y < 0) y += window.innerHeight;
             setTimeout(() => { scrollColor = '#787878'; }, 300);
         }, { passive: false });
     </script>
