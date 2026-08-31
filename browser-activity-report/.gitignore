@@ -1,0 +1,59 @@
+# ---------------------------------------------------------------------------
+# NEVER commit collected data or generated reports. These can contain real
+# browsing history and personal / sensitive information.
+# ---------------------------------------------------------------------------
+
+# Captured browser history databases (any form)
+*History_*
+ChromeHistory_*
+EdgeHistory_*
+*.db
+*.sqlite
+*.sqlite3
+*-wal
+*-shm
+
+# Generated reports and any spreadsheets
+*.xlsx
+*.xls
+*.csv
+
+# Collection manifests and error logs
+_collection_manifest*.csv
+_manifest_*.csv
+*_error.log
+BrowserReport_error.log
+
+# Common working-folder names used by the tool
+Captures/
+captures/
+Reports/
+reports/
+out/
+out_*/
+demo_out/
+sample/
+
+# ---------------------------------------------------------------------------
+# Python / build artifacts
+# ---------------------------------------------------------------------------
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# PyInstaller
+build/
+dist/
+*.spec
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
