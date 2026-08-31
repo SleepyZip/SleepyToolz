@@ -50,8 +50,11 @@ if ($Username -eq $env:USERNAME) {
     $mappings = Get-OfflineMappings $profilePath
 }
 
+Write-Output "User: $Username"
+Write-Output ""
+
 if (-not $mappings) {
-    Write-Output "No persistent mapped drives found for $Username."
+    Write-Output "No persistent mapped drives found."
     exit 0
 }
 

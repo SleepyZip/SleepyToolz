@@ -37,6 +37,9 @@ unfamiliar workstation or a routine cleanup pass.
 `Reset-NetworkStack.bat` just needs to be run as Administrator. `Get-/Set-UserNetworkShares.ps1` need admin rights too when targeting another user, since they load that user's registry hive directly.
 
 ```powershell
+# Show your own username and mapped drives, no arguments needed
+.\Get-UserNetworkShares.ps1
+
 # Read another user's mapped drives (they must be logged off) and export them
 .\Get-UserNetworkShares.ps1 -Username jsmith -ExportPath jsmith-shares.csv
 
