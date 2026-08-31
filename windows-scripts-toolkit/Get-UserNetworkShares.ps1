@@ -1,4 +1,4 @@
-<#
+﻿<#
 Reads a user's persistent mapped network drives (drive letter + full UNC path).
 Works live for the current session, or offline for a user profile that isn't
 logged in (loads their registry hive directly). Export with -ExportPath and
@@ -39,28 +39,37 @@ function Get-OfflineMappings($ProfilePath) {
     }
 }
 
-if ($Username -eq $env:USERNAME) {
-    $mappings = Get-MappingsFromKey "HKCU:\Network"
-} else {
-    $profilePath = "C:\Users\$Username"
-    if (-not (Test-Path $profilePath)) {
-        throw "No profile found for $Username at $profilePath"
+try {
+    if ($Username -eq $env:USERNAME) {
+        $mappings = Get-MappingsFromKey "HKCU:\Network"
+    } else {
+        $profilePath = "C:\Users\$Username"
+        if (-not (Test-Path $profilePath)) {
+            throw "No profile found for $Username at $profilePath"
+        }
+        Write-Output "Reading offline profile for $Username (they must not be currently logged in)..."
+        $mappings = Get-OfflineMappings $profilePath
     }
-    Write-Output "Reading offline profile for $Username (they must not be currently logged in)..."
-    $mappings = Get-OfflineMappings $profilePath
-}
 
-Write-Output "User: $Username"
-Write-Output ""
+    Write-Output "User: $Username"
+    Write-Output ""
 
-if (-not $mappings) {
-    Write-Output "No persistent mapped drives found."
-    exit 0
-}
+    if (-not $mappings) {
+        Write-Output "No persistent mapped drives found."
+    } else {
+        $mappings | Format-Table -AutoSize
 
-$mappings | Format-Table -AutoSize
-
-if ($ExportPath) {
-    $mappings | Export-Csv -Path $ExportPath -NoTypeInformation
-    Write-Output "Exported to $ExportPath"
+        if ($ExportPath) {
+            $mappings | Export-Csv -Path $ExportPath -NoTypeInformation
+            Write-Output "Exported to $ExportPath"
+        }
+    }
+} catch {
+    Write-Output "Error: $_"
+} finally {
+    # Keeps the window open if launched by double-click, where PowerShell
+    # closes the console the instant the script finishes.
+    if ($Host.Name -eq "ConsoleHost") {
+        Read-Host "`nPress Enter to close"
+    }
 }
