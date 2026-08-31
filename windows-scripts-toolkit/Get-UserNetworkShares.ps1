@@ -67,9 +67,16 @@ try {
 } catch {
     Write-Output "Error: $_"
 } finally {
-    # Keeps the window open if launched by double-click, where PowerShell
-    # closes the console the instant the script finishes.
+    # Keeps the window open if launched by double-click or "Run with PowerShell",
+    # both of which close the console the instant the script finishes.
+    # [Console]::ReadKey is used instead of Read-Host because "Run with PowerShell"
+    # launches with -NonInteractive, which makes Read-Host throw instead of prompt.
     if ($Host.Name -eq "ConsoleHost") {
-        Read-Host "`nPress Enter to close"
+        Write-Output "`nPress any key to close..."
+        try {
+            [Console]::ReadKey($true) | Out-Null
+        } catch {
+            Start-Sleep -Seconds 15
+        }
     }
 }
